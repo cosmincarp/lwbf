@@ -1,0 +1,13 @@
+
+Compiler:
+D   + buffer the output, and then push it to print function;
+    + more optimization?
+    + refactorize the code
+    + should return object { code, errors, warnings }
+
+Editor:
+    + ??
+
+Debuger:
+    + Get code from the editor, write some step-by-step UI for debugging, buttons: next, skip loop;
+    + compile loops ahead
