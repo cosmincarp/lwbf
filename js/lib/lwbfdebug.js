@@ -73,8 +73,16 @@ class LWBFDebug {
                     dp--;
                     break;
                 case '[':
-                    this.openedLoops.push(ip);
+                    if(this.machineState.memory[dp]) {
+                        this.openedLoops.push(ip);
+                    }
+                    else {
+                        while(this.rawCode[ip] != ']') {
+                            ip++;
+                        }
+                    }
                     break;
+
                 case ']':
                     if(this.machineState.memory[dp]){
                         ip = this.openedLoops[this.openedLoops.length-1];

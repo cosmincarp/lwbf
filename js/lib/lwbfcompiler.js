@@ -373,6 +373,7 @@ class LWBFCompiler {
 
                 case OP_LOOP:
                     for(let loops = 0; loops < token.occurrences; loops++){
+                        compiledCode += "if(m[i])";
                         compiledCode += "do{";
                         openedLoops++;
                     }
