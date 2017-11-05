@@ -15,7 +15,7 @@ const OP_TYPE_LOOP  = 3;
 const OP_TYPE_DEBUG = 4;
 
 
-class LBFCompiler {
+class LWBFCompiler {
 
     constructor(/* settings */){
         this.cellSize        = CELL_8_BIT;
@@ -124,7 +124,9 @@ class LBFCompiler {
 */
         // parsing
         parsedCode = []
-        for(let token of code){
+        //for(let token of code){
+        for(let i = 0; i < code.length; ++i) {
+            token = code[i];
             switch(token){
                 case '+':
                     parsedCode.push({
@@ -195,7 +197,11 @@ class LBFCompiler {
                         symbol: token,
                         instruction: OP_DEBUG,
                         type: OP_TYPE_DEBUG,
-                        occurrences: 1
+                        occurrences: 1,
+                        additional:
+                        {
+                            ip: i
+                        }
                     });
                     break;
                 default:
@@ -219,25 +225,33 @@ class LBFCompiler {
                     i++;
                     continue;
                 } else {
-                    optimizedCode.push({
-                        symbol: prevToken.symbol,
-                        instruction: prevToken.instruction,
-                        type: prevToken.type,
-                        complementary: ((prevToken.type == OP_TYPE_ALG || prevToken.type == OP_TYPE_MEM) ? true : false),
-                        occurrences: numOfRepeats
-                    });
+                    // optimizedCode.push({
+                    //     symbol: prevToken.symbol,
+                    //     instruction: prevToken.instruction,
+                    //     type: prevToken.type,
+                    //     complementary: ((prevToken.type == OP_TYPE_ALG || prevToken.type == OP_TYPE_MEM) ? true : false),
+                    //     occurrences: numOfRepeats
+                    // });
+
+                    // FIX keep additional field
+                    prevToken.complementary =  ((prevToken.type == OP_TYPE_ALG || prevToken.type == OP_TYPE_MEM) ? true : false);
+                    prevToken.occurrences = numOfRepeats;
+                    optimizedCode.push(prevToken);
+
                     numOfRepeats = 1;
                     prevToken = parsedCode[i];
                     i++;
                 }
             }
 
-            optimizedCode.push({
-                symbol: prevToken.symbol,
-                instruction: prevToken.instruction,
-                type: prevToken.type,
-                occurrences: numOfRepeats
-            });
+            // optimizedCode.push({
+            //     symbol: prevToken.symbol,
+            //     instruction: prevToken.instruction,
+            //     type: prevToken.type,
+            //     occurrences: numOfRepeats
+            // });
+            prevToken.occurrences = numOfRepeats;
+            optimizedCode.push(prevToken);
 
             // optimization level 2
             // grouping adiacent complementary operations (+/- </>)
@@ -322,6 +336,7 @@ class LBFCompiler {
         openedLoops = 0;
         for(token of optimizedCodeLevel2){
             switch (token.instruction) {
+
                 case OP_ADD:
                     if(token.occurrences == 1){
                         compiledCode += "m[i]++;";
@@ -329,6 +344,7 @@ class LBFCompiler {
                         compiledCode += "m[i]+=" + token.occurrences.toString() + ";";
                     }
                     break;
+
                 case OP_SUB:
                     if(token.occurrences == 1){
                         compiledCode += "m[i]--;";
@@ -337,6 +353,7 @@ class LBFCompiler {
                     }
 
                     break;
+
                 case OP_LEFT:
                     if(token.occurrences == 1){
                         compiledCode += "i--;";
@@ -345,6 +362,7 @@ class LBFCompiler {
                     }
 
                     break;
+
                 case OP_RIGHT:
                     if(token.occurrences == 1){
                         compiledCode += "i++;";
@@ -352,34 +370,43 @@ class LBFCompiler {
                         compiledCode += "i+=" + token.occurrences.toString() + ";";
                     }
                     break;
+
                 case OP_LOOP:
                     for(let loops = 0; loops < token.occurrences; loops++){
                         compiledCode += "do{";
                         openedLoops++;
                     }
                     break;
+
                 case OP_POOL:
                     for(let loops = 0; loops < token.occurrences; loops++){
                         compiledCode += "}while(m[i]);";
                         openedLoops--;
                     }
                     break;
+
                 case OP_IN:
                     compiledCode += "m[i]=n[j];j++;";
                     break;
+
                 case OP_OUT:
                     for(let outs = 0; outs < token.occurrences; outs++){
                         compiledCode += "o+=p(m[i]);";
                         compiledCode += "console.log(p(m[i]));";
                     }
                     break;
+
                 case OP_DEBUG:
                     while(this.debug && openedLoops > 0){
                         compiledCode += "}while(0);";
+                        openedLoops--;
                     }
+                    compiledCode += "return {memory: m, data_pointer: i, instruction_pointer:" + token.additional.ip.toString() + ", output: o, input: n, input_pointer:j, no_breakpoint: false};";
+                    return compiledCode;
                     break;
-                default:
 
+                default:
+                    break;
             }
             if(token.instruction == OP_DEBUG){
                 break;

@@ -1,4 +1,4 @@
-class BFDebug {
+class LWBFDebug {
     /*
         Machine State Object (MSO)
         memory: uint array;
@@ -23,15 +23,16 @@ class BFDebug {
             generatedF  = null;
 
         // Construct compiler settings
-        settings = LBFEditor.getEditorSettings(this.editor);
+        settings = LWBFEditor.getEditorSettings(this.editor);
         settings.environment     = ENV_DEBUG; //ENV_EDITOR;
         settings.debug           = true;
         settings.preproc         = false;
 
         // Compile
         this.rawCode = this.editor.code.value;
+        var compiler = new LWBFCompiler(settings);
         try {
-            debugCode = BFCompiler.compiler(this.rawCode, settings);
+            debugCode = compiler.compile(this.rawCode);
         } catch (e) {
             console.log(e.name + ": " + e.message);
         }
@@ -39,12 +40,12 @@ class BFDebug {
         generatedF = new Function("n", debugCode);
 
         // Get input
-        this.input = LBFEditor.parseInput(this.editor);
+        this.input = LWBFEditor.parseInput(this.editor);
 
         // Run code
         this.machineState = generatedF(this.input);
 
-        LBFEditor.output(this.editor, this.machineState.output);
+        LWBFEditor.output(this.editor, this.machineState.output);
 
         // return this.machineState;
     }

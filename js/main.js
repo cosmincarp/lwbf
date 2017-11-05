@@ -1,4 +1,4 @@
-var editor = new LBFEditor(
+var editor = new LWBFEditor(
     {
         code              : document.getElementById("code"),
         run_button        : document.getElementById("run-button"),

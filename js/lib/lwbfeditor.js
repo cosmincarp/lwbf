@@ -1,4 +1,4 @@
-class LBFEditor {
+class LWBFEditor {
     /*  Editor Object
      *  code
      *  run_button
@@ -61,13 +61,13 @@ class LBFEditor {
             output          = '';
         
         // Get the settings of the editor
-        settings = LBFEditor.getEditorSettings(this);
+        settings = LWBFEditor.getEditorSettings(this);
         settings.environment     = env; //ENV_EDITOR;
         settings.surpress_errors = false;
         settings.debug           = false;
         settings.preproc         = true;
         
-        var compiler = new LBFCompiler(settings);
+        var compiler = new LWBFCompiler(settings);
 
         // Compile the raw code, then return the result
         rawCode = this.code.value;
@@ -89,13 +89,13 @@ class LBFEditor {
         generatedF = new Function("n", this.beforeCompile(ENV_EDITOR));
 
         // Get input
-        input = LBFEditor.parseInput(this);
+        input = LWBFEditor.parseInput(this);
 
         // Run generated Function
         output = generatedF(input);
 
         // Print output
-        LBFEditor.output(this, output);
+        LWBFEditor.output(this, output);
     }
 
     compile(){
@@ -110,15 +110,14 @@ class LBFEditor {
     debug(){
         var rawCode     = '',
             rawHtml     = '',
-            indexChar   = 0,
-            memoryHtml  = '';
+            indexChar   = 0;
 
         this.step_button.disabled = false;
         this.step_out_button.disabled = false;        
         this.stop_button.disabled = false;
 
         // Start debugging
-        this.db = new BFDebug(this);
+        this.db = new LWBFDebug(this);
         this.db.compileAndPreRun();
 
         // hide disabled debug message
@@ -126,17 +125,7 @@ class LBFEditor {
         document.getElementById("debug-tab-button").dispatchEvent(new Event('click'));
 
         // dump memory in memory visualizer
-        for(let m in this.db.machineState.memory){
-            memoryHtml += "<span class=\"memory-cell-" + m.toString() + "\">";
-            // memoryHtml += this.db.machineState.memory[m].toString();
-            memoryHtml += LBFUtils.toHex(this.db.machineState.memory[m]);
- 
-            memoryHtml += "</span>";
-            console.log(m);
-            if(m == 256) break;
-        }
-
-        this.memory_dump.innerHTML = memoryHtml;
+        this.dumpMemory(this.db.machineState.data_pointer);
 
         rawCode = this.code.value;
         indexChar  = 0;
@@ -147,7 +136,7 @@ class LBFEditor {
             }
             if(/[\<\>\+\-\.\,\[\]\#]/g.test(char)){
                 rawHtml += "<span class=\"debug-char-" + indexChar.toString();
-                if(indexChar == this.db.machineState.instruction_pointer){
+                if(indexChar == this.db.machineState.instruction_pointer + 1){
                     rawHtml += " next-instruction";
                 }
                 rawHtml += "\">";
@@ -185,6 +174,8 @@ class LBFEditor {
                 document.getElementsByClassName('debug-char-' + this.db.machineState.instruction_pointer)[0].className += " next-instruction";
             }
         }
+
+        this.refreshMemory(ms.data_pointer);
 
     }
 
@@ -228,6 +219,34 @@ class LBFEditor {
 
     static output(t, o){
         t.output.value = o;
+    }
+
+    dumpMemory(data_p) {
+        var memoryHtml  = '';
+        for(let m in this.db.machineState.memory){
+            memoryHtml += "<span class=\"memory-cell-" + m.toString();
+            if(m == data_p)
+                memoryHtml += " focused-cell";
+
+            memoryHtml += "\">";
+                
+            // memoryHtml += this.db.machineState.memory[m].toString();
+            memoryHtml += LBFUtils.toHex(this.db.machineState.memory[m]);
+ 
+            memoryHtml += "</span>";
+            console.log(m);
+            if(m == 256) break;
+        }
+
+        this.memory_dump.innerHTML = memoryHtml;
+    }
+
+    refreshMemory(data_p){
+        document.getElementsByClassName("focused-cell")[0].classList.remove("focused-cell");
+        document.getElementsByClassName("memory-cell-" + data_p.toString())[0].classList.add("focused-cell");
+
+        document.getElementsByClassName("focused-cell")[0].innerHTML = LBFUtils.toHex(this.db.machineState.memory[data_p]);
+        
     }
 
     addKeyBindings(){
