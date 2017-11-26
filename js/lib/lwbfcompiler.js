@@ -1,20 +1,3 @@
-const OP_ADD        = 0;
-const OP_SUB        = 1;
-const OP_LEFT       = 2;
-const OP_RIGHT      = 3;
-const OP_LOOP       = 4;
-const OP_POOL       = 5;
-const OP_IN         = 6;
-const OP_OUT        = 7;
-const OP_DEBUG      = 8;
-
-const OP_TYPE_ALG   = 0;
-const OP_TYPE_MEM   = 1;
-const OP_TYPE_IO    = 2;
-const OP_TYPE_LOOP  = 3;
-const OP_TYPE_DEBUG = 4;
-
-
 class LWBFCompiler {
 
     constructor(/* settings */){
@@ -35,7 +18,7 @@ class LWBFCompiler {
 
     compile(code){
         var parsedCode, optimizedCode, prevToken, token, numOfRepeats, i,
-            optimizedCodeLevel2, offset, compiledCode, openedLoops, lookAhead;
+            optimizedCodeLevel2, offset, compiledCode, loops, lookAhead;
 
         if(typeof(code) != "string" || code.length == 0){
             throw new Error("Argument of function must be string.");
@@ -333,8 +316,11 @@ class LWBFCompiler {
         }
 
         // Generate code
-        openedLoops = 0;
-        for(token of optimizedCodeLevel2){
+        loops = 0;
+        // openedLoops = [];
+        // for(var [index,token] of optimizedCodeLevel2){
+        for(var index = 0; index < optimizedCodeLevel2.length; ++index) {
+            let token = optimizedCodeLevel2[index];
             switch (token.instruction) {
 
                 case OP_ADD:
@@ -372,17 +358,19 @@ class LWBFCompiler {
                     break;
 
                 case OP_LOOP:
-                    for(let loops = 0; loops < token.occurrences; loops++){
+                    for(let loops_iterator = 0; loops_iterator < token.occurrences; loops_iterator++){
                         compiledCode += "if(m[i])";
                         compiledCode += "do{";
-                        openedLoops++;
+                        loops++;
+                        // openedLoops.push(index);
                     }
                     break;
 
                 case OP_POOL:
                     for(let loops = 0; loops < token.occurrences; loops++){
                         compiledCode += "}while(m[i]);";
-                        openedLoops--;
+                        // loops--;
+                        // openedLoops.pop();
                     }
                     break;
 
@@ -398,19 +386,36 @@ class LWBFCompiler {
                     break;
 
                 case OP_DEBUG:
-                    while(this.debug && openedLoops > 0){
+                    while(this.debug && loops > 0){
                         compiledCode += "}while(0);";
-                        openedLoops--;
+                        loops--;
+                        // openedLoops.pop();
                     }
-                    compiledCode += "return {memory: m, data_pointer: i, instruction_pointer:" + token.additional.ip.toString() + ", output: o, input: n, input_pointer:j, no_breakpoint: false};";
-                    return compiledCode;
+                    // for(let i = 0; i < openedLoops.length; ++i) {
+                    //     compiledCode += "}while(0);";
+                    // }
+                    compiledCode += "return {memory: m, data_pointer: i, instruction_pointer:"
+                                    + token.additional.ip.toString() +
+                                    ", output: o, input: n, input_pointer:j, no_breakpoint: false};";
+                    var openedLoops = [];
+                    for(let i = 0; i < code.length && code[i] != '#'; ++i)
+                    {
+                        switch(code[i])
+                        {
+                            case '[':
+                                openedLoops.push(i);
+                                break;
+
+                            case ']':
+                                openedLoops.pop(i);
+                                break;
+                        }
+                    }
+                    return {compiledCode, openedLoops};
                     break;
 
                 default:
                     break;
-            }
-            if(token.instruction == OP_DEBUG){
-                break;
             }
         }
 
@@ -419,7 +424,7 @@ class LWBFCompiler {
         }
         else if(this.environment == ENV_NATIVE)
         {
-            compiledCode += "console.log(o);"            
+            compiledCode += "console.log(o);"
         }
         else {
             compiledCode += "return o;";

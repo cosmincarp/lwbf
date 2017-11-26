@@ -30,26 +30,34 @@ class LWBFEditor {
         this.stop_button        = null; 
         this.reset_button       = null;
         this.memory_dump        = null;
-               
+
+        //  Copy argments and overwrite settings
         for(let i = 0; i < arguments.length; i++){
             if(typeof(arguments[i]) == "object"){
                 Object.assign(this, arguments[i]);
             }
         }
-
+        
+        //  Found a setting set to null? Not good. Throw error.
         for (var key in this) {
             if (this.hasOwnProperty(key) && key == null) {
                 throw new Error("Editor properties not set.");
             }
          }
 
+         // Set up all the event listeners
          this.addKeyBindings();
     }
 
-    run(){
-        this.addKeyBindings();
-    }
 
+    // run(){
+    //     this.addKeyBindings();
+    // }
+
+    //  Before compile function
+    //  @desc   Set up the settings, pass them to the LWBFCompiler and compile the existing code.
+    //  @arg    env     Environment in which this function is called
+    //  @return compiledCode
     beforeCompile(env){
         var settings        = {},
             cells           = null,
@@ -59,17 +67,16 @@ class LWBFEditor {
             generatedF      = null,
             input           = [],
             output          = '';
-        
-        // Get the settings of the editor
+        //  Get all the volatile settings of the editor (settings which can be modified at runtime),
+        //  and set some default and internal settings
         settings = LWBFEditor.getEditorSettings(this);
         settings.environment     = env; //ENV_EDITOR;
         settings.surpress_errors = false;
         settings.debug           = false;
         settings.preproc         = true;
         
+        // Compile the raw code, get the result
         var compiler = new LWBFCompiler(settings);
-
-        // Compile the raw code, then return the result
         rawCode = this.code.value;
         try {
             compiledCode = compiler.compile(rawCode);
@@ -81,6 +88,8 @@ class LWBFEditor {
         return compiledCode;
     }
 
+    //  Run function
+    //  @desc   Transpile the code from the editor to JS, run it and print out the result
     run(){
         var generatedF      = null,
             input           = [],
@@ -88,16 +97,18 @@ class LWBFEditor {
 
         generatedF = new Function("n", this.beforeCompile(ENV_EDITOR));
 
-        // Get input
+        //  Get input (read with `,`)
         input = LWBFEditor.parseInput(this);
 
-        // Run generated Function
+        //  Run the transpiled code
         output = generatedF(input);
 
-        // Print output
+        //  Print output, if any
         LWBFEditor.output(this, output);
     }
 
+    //  Compile function
+    //  @desc   Transpile the code from the editor to JS, paste it into an modal box, and pop it up.
     compile(){
         var jsCode = '';
         jsCode = this.beforeCompile(ENV_NATIVE);
@@ -107,6 +118,8 @@ class LWBFEditor {
         $("#js-compiled-code").modal('toggle');
     }
 
+    //  Debug function
+    //  @desc   Starts debugging, "renders" the code debugger screen.
     debug(){
         var rawCode     = '',
             rawHtml     = '',
@@ -116,36 +129,34 @@ class LWBFEditor {
         this.step_out_button.disabled = false;        
         this.stop_button.disabled = false;
 
-        // Start debugging
+        //  Start debugging
         this.db = new LWBFDebug(this);
         this.db.compileAndPreRun();
 
-        // hide disabled debug message
+        //  Hide "Press X to start debugging" message
         document.getElementById("editor-debug-code-disabled").style.display = "none";
         document.getElementById("debug-tab-button").dispatchEvent(new Event('click'));
 
-        // dump memory in memory visualizer
+        //  Dump the machine's memory
         this.dumpMemory(this.db.machineState.data_pointer);
 
         rawCode = this.code.value;
         indexChar  = 0;
         for(let char of rawCode){
-            if(char == "\n"){
+            if(char == "\n") {
                 rawHtml += "<br>";
-                continue;
-            }
-            if(/[\<\>\+\-\.\,\[\]\#]/g.test(char)){
+            } else if(/[\<\>\+\-\.\,\[\]\#]/g.test(char)) {
                 rawHtml += "<span class=\"debug-char-" + indexChar.toString();
-                if(indexChar == this.db.machineState.instruction_pointer + 1){
+                if(indexChar == this.db.machineState.instruction_pointer + 1) {
                     rawHtml += " next-instruction";
                 }
                 rawHtml += "\">";
                 rawHtml += char;
                 rawHtml += "</span>";
                 indexChar++;
-                continue;
+            } else {
+                rawHtml += char;
             }
-            //rawHtml += char;
         }
 
         if(this.db.machineState.no_breakpoint){
@@ -157,12 +168,14 @@ class LWBFEditor {
         this.debug_code.innerHTML = rawHtml;
     }
 
+    //  Step function
+    //  @desc   Step the program, mark the next instruction, make the necessary changes to the memory visualizer.
     step(){
         var ms;
 
         var nextInstruction = document.getElementsByClassName("next-instruction")[0];
 
-        // step
+        // Step the debugger
         ms = this.db.step();
         if(ms.end_reached) {
             this.stopDebug();
@@ -176,21 +189,29 @@ class LWBFEditor {
         }
 
         this.refreshMemory(ms.data_pointer);
-
     }
 
+    //  Step out of loop function
+    //  @desc   Steps the debugger until it exits the current while loop
+    //TODO: Fix this v so it escapes the current loop, not all the nested loops
     stepOutOfLoop(){
+        var nestedLoops = this.db.machineState.openedLoops.length;
         do {
             this.step();
-        } while(this.db.openedLoops.length);
+        } while(nestedLoops - 1 == this.db.machineState.openedLoops.length || this.db.machineState.openedLoops.length != 0);
     }
 
+    //  Stop debugger function
+    //  @desc   Disable some buttons.
     stopDebug(){
         this.step_button.disabled = true;
         this.step_out_button.disabled = true;
         this.stop_button.disabled = true;
     }
 
+    //  Reset debugger function
+    //  @desc   Enable the buttons, clear the visualizer
+    //TODO: FIX ^ clear the memory, too.
     resetDebug(){
         this.step_button.disabled = true;
         this.step_out_button.disabled = true;        
@@ -201,6 +222,11 @@ class LWBFEditor {
         document.getElementById("editor-tab-button").dispatchEvent(new Event('click'));
     }
 
+    //  Parse Input
+    //  @desc   Get the input string, and parse it 
+    //  @arg    t   input string
+    //  @return parsedInput
+    //TODO: ADD support for characters ('a' => ASCII('a'))
     static parseInput(t){
         var input       = null,
             i           = 0,
@@ -217,10 +243,18 @@ class LWBFEditor {
         return parsedInput;
     }
 
+    //  Output function
+    //  @desc   Print out the output generated by the code
+    //  @arg    t   - editor
+    //  @arg    o   - output value
     static output(t, o){
         t.output.value = o;
     }
 
+    //  Dump memory function
+    //  @desc   Initial memory dump, generate the memory matrix / visualiser, and put a mark on the current
+    //          selected cell
+    //TODO: v Beautify this
     dumpMemory(data_p) {
         var memoryHtml  = '';
         for(let m in this.db.machineState.memory){
@@ -234,7 +268,6 @@ class LWBFEditor {
             memoryHtml += LBFUtils.toHex(this.db.machineState.memory[m]);
  
             memoryHtml += "</span>";
-            console.log(m);
             if(m == 256) break;
         }
 
